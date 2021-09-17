@@ -1,0 +1,96 @@
+\documentclass{slides}
+
+\usepackage[papersize={24cm,13.5cm},margin=0cm]{geometry}
+\usepackage{graphicx}
+
+\begin{document}
+\begin{center}
+
+    \large
+
+    \begin{slide}
+        {\Huge Quiz} \vspace{1em}\break
+        Interpretation of Sensitivity Maps
+
+        {\tiny Examples adapted from Maddison et al. (2019)}
+    \end{slide}
+
+
+    \begin{slide}
+        {\Huge Example 1} \vspace{1em}\break
+        Different Amplitude \break
+        Same Location
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-A-intensity-inc-ens}
+    \end{slide}
+    \makeatletter
+    \@for\i:={0,1,2,3,4}\do{
+        \begin{slide}
+            \includegraphics[width=\textwidth]{fig-A-intensity-inc-\i}
+        \end{slide}
+    }
+    \makeatother
+
+
+    \begin{slide}
+        {\Huge Example 2} \vspace{1em}\break
+        Different Amplitude \break
+        Same Location
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-B-intensity-dec-ens}
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-B-intensity-dec-0}
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-B-intensity-dec-4}
+    \end{slide}
+
+
+    \begin{slide}
+        {\Huge Example 3} \vspace{1em}\break
+        Same Amplitude \break
+        Different Location
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-C-translation-ens}
+    \end{slide}
+    \makeatletter
+        \@for\i:={0,1,2,3,4,5}\do{
+            \begin{slide}
+                \includegraphics[width=\textwidth]{fig-C-translation-\i}
+            \end{slide}
+        }
+    \makeatother
+
+
+    \begin{slide}
+        {\Huge Example 4} \vspace{1em}\break
+        Different Amplitude \break
+        Different Location
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-D-translation-inc-0}
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-D-translation-inc-5}
+    \end{slide}
+
+
+    \begin{slide}
+        {\Huge Example 5} \vspace{1em}\break
+        Different Amplitude \break
+        Different Location
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-E-translation-dec-0}
+    \end{slide}
+    \begin{slide}
+        \includegraphics[width=\textwidth]{fig-E-translation-dec-5}
+    \end{slide}
+
+\end{center} 
+\end{document}
+
