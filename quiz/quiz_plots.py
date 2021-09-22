@@ -4,30 +4,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 
+
+# Ensemble size for case generation
+n = 50
+
+# Spatial Domain
 x = np.linspace(-2, 2, 101)
 y = np.linspace(-1, 1, 101)
 xx, yy = np.meshgrid(x, y)
 
 
-def esa_corr(source, target):
+def esa_slope(source, target):
     src = source - source.mean(axis=0)
     tgt = target - target.mean()
-    # Standard deviation
-    std_src = np.sqrt( np.sum(src * src, axis=0) )
-    std_tgt = np.sqrt( np.sum(tgt * tgt) )
-    # Covariance, normalized by product of standard deviations = correlation
+    # Set small variances to infinity to obtain slopes of zero. This eliminates
+    # the div/0 problem for synthetic data
+    src_var = np.sum(src * src, axis=0)
+    src_var[src_var < 1.0e-3] = np.inf
+    # Slope = covariance divided by variance of source
     cov = np.sum((src * tgt[:,None,None]), axis=0)
-    return cov / std_src / std_tgt
+    return cov / src_var
 
 
-def make_source(x=0., amplitude=10.):
-    return amplitude * np.exp(-8*(xx - x)**2 - 8*yy**2) + 0.1*np.random.random(xx.shape)
-
-
-# Colormap setup for correlation-based sensitivity maps (based on Magnusson 2017)
-corr_kwargs = {
-    "levels": [-1., -0.75, -0.5, -0.25, 0.25, 0.5, 0.75, 1.],
-    "colors": ["#6D41A3", "#3758AF", "#57C9F5", "#FFFFFF", "#F9C719", "#F68026", "#EF282E"]
+# Colormap setup for slope-based sensitivity maps. We only really care about
+# positive or negative slopes here, so choose something simple.
+slope_kwargs = {
+    "levels": [-5, -1, 1, 5],
+    "colors": ["#3758AF", "#FFFFFF", "#EF282E"],
+    "extend": "both"
 }
 
 # Text annotations setup
@@ -56,8 +60,8 @@ def get_lomdhi(n):
     cs[md] = "black"
     cs[hi] = "red"
     # ...and size
-    ss = [10] * n
-    ss[lo] = ss[md] = ss[hi] = 40
+    ss = [40] * n
+    ss[lo] = ss[md] = ss[hi] = 100
     return lo, md, hi, cs, ss
 
 
@@ -109,62 +113,56 @@ def ens_figure(src, tgt):
     return fig
 
 
-def quiz_figure(src, tgt, pois=None, show_esa=True):
+def quiz_figure(src, tgt, poi=None, show_esa=True):
     fig = plt.figure(figsize=(12, 6))
     assert src.shape[0] == tgt.size
     n = src.shape[0]
     lo, md, hi, cs, ss = get_lomdhi(n)
 
+    # Source field samples from ensemble
     ax_src = fig.add_axes((0.05, 0.55, 0.38, 0.38))
-    ax_src.contour(xx, yy, src[lo], colors="blue", levels=[5, 11])
-    ax_src.contour(xx, yy, src[md], colors="black", levels=[5, 11])
-    ax_src.contour(xx, yy, src[hi], colors="red", levels=[5, 11])
+    ax_src.contour(xx, yy, src[lo], colors="blue", levels=[-1, 5, 11])
+    ax_src.contour(xx, yy, src[md], colors="black", levels=[-1, 5, 11])
+    ax_src.contour(xx, yy, src[hi], colors="red", levels=[-1, 5, 11])
     ax_src.text(-1.5, -0.8, f"{tgt[lo]:.0f}", color="blue", **text_kwargs)
     ax_src.text(   0, -0.8, f"{tgt[md]:.0f}", color="black", **text_kwargs)
     ax_src.text( 1.5, -0.8, f"{tgt[hi]:.0f}", color="red", **text_kwargs)
     ax_src.set_xticks([])
     ax_src.set_yticks([])
-
+    
     if show_esa:
         ax_esa = fig.add_axes((0.05, 0.05, 0.38, 0.38))
-        cf = ax_esa.contourf(xx, yy, esa_corr(src, tgt), **corr_kwargs)
+        cf = ax_esa.contourf(xx, yy, esa_slope(src, tgt), **slope_kwargs)
         ax_esa.set_title("Sensitivity", loc="left", fontsize=18)
         ax_esa.set_xticks([])
         ax_esa.set_yticks([])
 
         pos = ax_esa.get_position()
-        cax = fig.add_axes((pos.x1-0.2, pos.y1, 0.2, 0.03))
+        cax = fig.add_axes((pos.x1-0.2, pos.y1+0.001, 0.2, 0.03))
         cb = plt.colorbar(cf, cax=cax, orientation="horizontal", spacing="proportional")    
         cax.tick_params(axis="x", bottom=False, top=True, labelbottom=False, labeltop=True)
-        cb.set_ticks([-1, -0.5, 0, 0.5, 1])
-        cax.set_xticklabels(["$-1$", "$-0.5$", "$0$", "$0.5$", "$1$"], fontsize="large")
+        cb.set_ticks([-3.5, 0, 3.5])
+        cax.set_xticklabels(["negative", "no", "positive"], fontsize="large")
 
-    ax_abcd_pos = [
-        (0.52, 0.55, 0.19, 0.38),
-        (0.78, 0.55, 0.19, 0.38),
-        (0.52, 0.05, 0.19, 0.38),
-        (0.78, 0.05, 0.19, 0.38)
-    ]
-    if pois is not None:
-        for poi, ax_pos, letter in zip(pois, ax_abcd_pos, "ABCD"):
-            ax = fig.add_axes(ax_pos)
-            # Get values for point of interest
-            i, j = poi
-            xs = src[:,j,i]
-            ys = tgt
-            # Show point cloud and regression line
-            ax.scatter(xs, ys, s=ss, c=cs)
-            reg = linregress(xs, ys)
-            ax.plot(
-                [min(xs), max(xs)],
-                [reg.slope*min(xs)+reg.intercept, reg.slope*max(xs)+reg.intercept],
-                linewidth=1.5,
-                linestyle="dashed",
-                color="#333"
-            )
-            ax.set_title(letter, loc="left", fontsize=18)
-            ax.set_title(f"$r = {reg.rvalue:.2f}$", loc="right")
-            ax_esa.text(x[i], y[j], letter, **text_kwargs)
+    if poi is not None:
+        ax_poi = fig.add_axes((0.52, 0.05, 0.40, 0.88))
+        # Get values for point of interest
+        i, j = poi
+        xs = src[:,j,i]
+        ys = tgt
+        # Show point cloud and regression line
+        ax_poi.scatter(xs, ys, s=ss, c=cs)
+        reg = linregress(xs, ys)
+        ax_poi.plot(
+            [min(xs), max(xs)],
+            [reg.slope*min(xs)+reg.intercept, reg.slope*max(xs)+reg.intercept],
+            linewidth=2,
+            linestyle="dashed",
+            color="#333"
+        )
+        # Marker in map plots
+        ax_src.text(x[i], y[j], "X", **text_kwargs)
+        ax_esa.text(x[i], y[j], "X", **text_kwargs)
 
     return fig
 
@@ -172,53 +170,68 @@ def quiz_figure(src, tgt, pois=None, show_esa=True):
 
 if __name__ == "__main__":
 
-    # Ensemble size for case generation
-    n = 50
-
     # Target values
-    target = np.linspace(80, 120, n)
-    
+    target = np.linspace(80, 120, n) + 0.4*np.random.random(n)
+
+    # Synthetic anomaly: Paraboloid, values are exactly zero out outside
+    # a certain radius (this is important, otherwise slope-based ESA finds
+    # extreme slopes in the outer regions, which we don't want).
+    def make_anomaly(x=0., amplitude=10.):
+        out = 1 - 1.5*((xx - x)**2 + yy**2)
+        out[out < 0] = 0.
+        return amplitude * out
+
+    def make_wave(phase, amplitude):
+        out = 5 * (yy + 1)
+        out += make_anomaly(phase-0.5, amplitude)
+        out -= make_anomaly(phase+0.5, amplitude)
+        return out
+
     # Source values and points of interest for the scatter plots
     cases = {
-        "A-intensity-inc": {
-            "source": np.asarray([make_source(0.0, 10+0.1*(i-n//2)) for i in range(n)]),
-            "pois": [(50, 50), (66, 40), (90, 30)]
+        "A-anom-inc": {
+            "source": np.asarray([make_anomaly(0.0, 10+0.1*(i-n//2)) for i in range(n)]),
+            "pois": [(50, 50)]
         },
-        "B-intensity-dec": {
-            "source": np.asarray([make_source(0.0, 10-0.1*(i-n//2)) for i in range(n)]),
-            "pois": [(50, 50), (66, 40), (90, 30)]
+        "B-anom-dec": {
+            "source": np.asarray([make_anomaly(0.0, 10-0.1*(i-n//2)) for i in range(n)]),
+            "pois": [(50, 50)]
         },
-        "C-translation": {
-            "source": np.asarray([make_source((i-n//2)/n, 10) for i in range(n)]),
-            "pois": [(38, 50), (50, 50), (62, 50), (90, 30)]
+        "C-anom-off": {
+            "source": np.asarray([make_anomaly((i-n//2)/n, 10) for i in range(n)]),
+            "pois": [(40, 50), (50, 50), (60, 50)]
         },
-        "D-translation-inc": {
-            "source": np.asarray([make_source((i-n//2)/n, 10+0.15*(i-n//2)) for i in range(n)]),
-            "pois": [(38, 50), (50, 50), (62, 50), (90, 30)]
+        "D-wave-inc": {
+            "source": np.asarray([make_wave(0, 2+0.05*(i-n//2)) for i in range(n)]),
+            "pois": [(38, 50)]
         },
-        "E-translation-dec": {
-            "source": np.asarray([make_source((i-n//2)/n, 10-0.15*(i-n//2)) for i in range(n)]),
-            "pois": [(38, 50), (50, 50), (62, 50), (90, 30)]
+        "E-wave-off": {
+            "source": np.asarray([make_wave((i-n//2)/n, 2.4) for i in range(n)]),
+            "pois": [(25, 50), (50, 50), (75, 50)]
         }
     }
-    
-    # ...
 
+    ext = "png"
+    dpi = 140
+    
     for name, case in cases.items():
+        
+        print(name)
+        
         fig = ens_figure(cases[name]["source"], target)
-        fig.savefig(f"fig-{name}-ens.pdf")
+        fig.savefig(f"fig-{name}-ens.{ext}", dpi=dpi)
         plt.close(fig)
 
         fig = quiz_figure(case["source"], target, show_esa=False)
-        fig.savefig(f"fig-{name}-0.pdf")
+        fig.savefig(f"fig-{name}-0.{ext}", dpi=dpi)
         plt.close(fig)
 
         fig = quiz_figure(case["source"], target)
-        fig.savefig(f"fig-{name}-1.pdf")
+        fig.savefig(f"fig-{name}-1.{ext}", dpi=dpi)
         plt.close(fig)
 
-        for i in range(len(case["pois"])):
-            fig = quiz_figure(case["source"], target, pois=case["pois"][:i+1])
-            fig.savefig(f"fig-{name}-{i+2}.pdf")
+        for i, poi in enumerate(case["pois"]):
+            fig = quiz_figure(case["source"], target, poi=poi)
+            fig.savefig(f"fig-{name}-{i+2}.{ext}", dpi=dpi)
             plt.close(fig)
 
