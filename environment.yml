@@ -1,0 +1,6 @@
+dependencies:
+  - numpy
+  - matplotlib
+  - cartopy
+  - xarray
+  - netcdf4
